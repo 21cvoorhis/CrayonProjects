@@ -1,0 +1,62 @@
+﻿import Math;
+import Game;
+import Graphics2D;
+
+//convert polar coordinates to rectangular coordinates
+//x coordinate
+function px(r, theta){
+	return r*Math.cos(theta);
+}
+
+//y coordinate
+function py(r, theta){
+	return r*Math.sin(theta);
+}
+
+function star(r, theta, points, spike, centerx, centery, pi){
+	
+	for(i = 0; i < points; i++){
+		
+		Graphics2D.Draw.line((px(r,theta)+centerx), (py(r,theta)+centery), (px(r/spike,theta+(pi/points))+centerx), (py(r/spike,theta+(pi/points))+centery), 3, 255, 255, 0, 255);
+		theta = theta + (pi/points);
+		
+		Graphics2D.Draw.line((px(r/spike,theta)+centerx), (py(r/spike,theta)+centery), (px(r,theta+(pi/points))+centerx), (py(r,theta+(pi/points))+centery), 3, 255, 255, 0, 255);
+		theta = theta + (pi/points);
+		
+	}
+}
+
+function main() {
+    window = new Game.GameWindow("Very Cool Picture", 30, 800, 800);
+
+    gameRunning = true;
+	
+	pi = Math.PI;
+	centerx = 400;
+	centery = 400;
+	r = 300; //radius
+	theta = 0;
+	w = pi/128; //angular velocity, in (30*radians)/second
+	spike = 2; //ratio of radius of outer points:radius of inner points
+	points = 5; //number of points on each star
+	
+    while (gameRunning) {
+		
+        eventList = window.pumpEvents();
+
+        for (i = 0; i < eventList.length; i++) {
+            event = eventList[i];
+            if (event.type == Game.EventType.QUIT) {
+                gameRunning = false;
+            }
+        }
+		
+        Graphics2D.Draw.fill(0, 0, 0);
+		
+		star(r, theta, points, spike, centerx, centery, pi);
+		theta = theta+pi;
+		star(r, theta, points, spike, centerx, centery, pi);
+		theta = theta + w;
+        window.clockTick();
+    }
+}

@@ -1,0 +1,56 @@
+﻿import Math;
+import Game;
+import Graphics2D;
+
+//convert polar coordinates to rectangular coordinates
+//x coordinate
+function px(r, theta){
+	return r*Math.cos(theta);
+}
+
+//y coordinate
+function py(r, theta){
+	return r*Math.sin(theta);
+}
+
+function star(r, theta, points, spike, centerx, centery, pi){
+	
+	for(i = 0; i < points*2; i++){
+		
+		Graphics2D.Draw.line((px(r,theta)+centerx), (py(r,theta)+centery), (px(r/spike,theta+(pi/points))+centerx), (py(r/spike,theta+(pi/points))+centery), 3, 255, 255, 0, 255);
+		
+		theta = ((pi/points)*(i+1));
+	}
+}
+
+function main() {
+    window = new Game.GameWindow("Very Cool Picture", 30, 800, 800);
+
+    gameRunning = true;
+	
+	pi = Math.PI;
+	centerx = 400;
+	centery = 400;
+	radius = 300;
+	spike = 2; //ratio of radius of outer points:radius of inner points
+	theta = 0;
+	points = 4;
+	
+    while (gameRunning) {
+		
+        eventList = window.pumpEvents();
+
+        for (i = 0; i < eventList.length; i++) {
+            event = eventList[i];
+            if (event.type == Game.EventType.QUIT) {
+                gameRunning = false;
+            }
+        }
+		
+        Graphics2D.Draw.fill(0, 0, 0);
+		
+		star(radius, theta, points, spike, centerx, centery, pi);
+		
+        window.clockTick();
+    }
+}

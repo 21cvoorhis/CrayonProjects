@@ -1,0 +1,128 @@
+﻿import Game;
+import Graphics2D;
+import Math;
+import ImageResources;
+
+function mix(a, b, amount){
+	return (1-amount)*a + amount*b;
+}
+
+function main(){
+	
+	title = "Mouse Moment";
+	fps = 30;
+	windowWidth = 800;
+	windowHeight = 600;
+	window = new Game.GameWindow(title, fps, windowWidth, windowHeight);
+	
+	gameRunning = true;
+	
+	//setting up variables in the default loading state
+	
+	keysPressed = {
+		"r": false,
+		"g": false,
+		"b": false,
+		"w": false,
+		"up": false,
+		"down": false,
+	};
+	
+	mousePos = {
+		"x": windowWidth/2,
+		"y": windowHeight/2,
+	};
+	
+	r = 255;
+	g = 255;
+	b = 255;
+	a = 255;
+	speed = 0.15;
+	boxX = windowWidth/2;
+	boxY = windowHeight/2;
+	size = 100;
+	
+	while(gameRunning){
+		eventList = window.pumpEvents();
+		
+		for (event : eventList) {
+			
+            if (event.type == Game.EventType.QUIT) {
+                gameRunning = false;
+            }
+			
+			//checking for keys being pressed
+			if (event.type == Game.EventType.KEY_DOWN || event.type == Game.EventType.KEY_UP){
+				isPress = (event.type == Game.EventType.KEY_DOWN); //this makes isPress true if event.type is KEY_DOWN, and false otherwise, to indicate if the key has been pressed this frame
+				switch(event.key){
+					case Game.KeyboardKey.R:
+						keysPressed["r"] = isPress;
+						break;
+					case Game.KeyboardKey.G:
+						keysPressed["g"] = isPress;
+						break;
+					case Game.KeyboardKey.B:
+						keysPressed["b"] = isPress;
+						break;
+					case Game.KeyboardKey.W:
+						keysPressed["w"] = isPress;
+						break;
+					case Game.KeyboardKey.UP:
+						keysPressed["up"] = isPress;
+						break;
+					case Game.KeyboardKey.DOWN:
+						keysPressed["down"] = isPress;
+						break;
+				}
+			}
+			
+			//checking for mouse movement
+			if(event.type == Game.EventType.MOUSE_MOVE){
+				mousePos["x"] = event.x;
+				mousePos["y"] = event.y;
+			}
+		}
+		
+		Graphics2D.Draw.fill(0, 0, 0);
+		
+		//change color based on key press
+		if(keysPressed["r"]){
+			r = 255;
+			g = 0;
+			b = 0;
+		}else if(keysPressed["g"]){
+			r = 0;
+			g = 255;
+			b = 0;
+			
+		}else if(keysPressed["b"]){
+			r = 0;
+			g = 0;
+			b = 255;
+		}else if(keysPressed["w"]){
+			r = 255;
+			g = 255;
+			b = 255;
+		}
+		
+		//change opacity based on key press
+		if(keysPressed["up"]){
+			if(a<255){
+				a = a + 4;
+			}
+		}else if(keysPressed["down"]){
+			if(a>0){
+				a = a - 4;
+			}
+		}
+		
+		//exponentially approach mouse
+		boxX = mix(boxX, mousePos["x"], speed);
+		boxY = mix(boxY, mousePos["y"], speed);
+		
+		Graphics2D.Draw.rectangle(boxX-(size/2), boxY-(size/2), size, size, r, g, b, a);
+		
+		window.clockTick();
+	}
+	
+}

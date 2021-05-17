@@ -1,0 +1,77 @@
+﻿import Game;
+import Graphics2D;
+import Math;
+import ImageResources;
+
+function mix(a, b, amount){
+	return (1-amount)*a + amount*b;
+}
+
+function main(){
+	
+	title = "Shadows?!";
+	fps = 30;
+	windowWidth = 800;
+	windowHeight = 600;
+	window = new Game.GameWindow(title, fps, windowWidth, windowHeight);
+	
+	gameRunning = true;
+	
+	//setting up variables in the default loading state
+	
+	keysPressed = {
+		"f": false, //placeholder value
+	};
+	
+	mousePos = {
+		"x": windowWidth/2,
+		"y": windowHeight/2,
+	};
+	
+	cornerx = 10;
+	cornery = 10;
+	
+	while(gameRunning){
+		eventList = window.pumpEvents();
+		
+		for (event : eventList) {
+			
+			//closes the game when an ending event is triggered
+            if (event.type == Game.EventType.QUIT) {
+                gameRunning = false;
+            }
+			
+			//checking for keys being pressed
+			if (event.type == Game.EventType.KEY_DOWN || event.type == Game.EventType.KEY_UP){
+				isPress = (event.type == Game.EventType.KEY_DOWN); //this makes isPress true if event.type is KEY_DOWN, and false otherwise, to indicate if the key has been pressed this frame
+				switch(event.key){
+					case Game.KeyboardKey.F:
+						keysPressed["f"] = isPress;
+						break;
+				}
+			}
+			
+			//checking for mouse movement
+			if(event.type == Game.EventType.MOUSE_MOVE){
+				mousePos["x"] = event.x;
+				mousePos["y"] = event.y;
+			}
+		}
+		
+		//make background black
+		Graphics2D.Draw.fill(0, 0, 0);
+		
+		for(i = 0; i<50; i++){
+			Graphics2D.Draw.rectangle(cornerx, cornery, 100, 100, 255, 255, 255, 63);
+			cornerx = cornerx * 1.1;
+			cornery = cornery * 1.1;
+		}
+		
+		cornerx = 10;
+		cornery = 10;
+		
+		
+		window.clockTick();
+	}
+	
+}

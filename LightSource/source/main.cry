@@ -1,0 +1,377 @@
+﻿import Game;
+import Graphics2D;
+import Math;
+import ImageResources;
+
+function mix(a, b, amount){
+	return (1-amount)*a + amount*b;
+}
+
+
+
+class Shape{
+	field color;
+	field points;
+	field segments;
+	field sideCount;
+	
+	constructor(color, points){
+		this.color = color;
+		this.points = points;
+		this.sideCount = points.length;
+		this.segments = [];
+		for(i = 0; i<this.sideCount; i++){
+			if(i<this.sideCount-1){
+				this.segments.add({
+					"x1": this.points[i]["x"], 
+					"y1": this.points[i]["y"], 
+					"x2": this.points[i+1]["x"], 
+					"y2": this.points[i+1]["y"],
+				});
+			}else{
+				this.segments.add({
+					"x1": this.points[i]["x"], 
+					"y1": this.points[i]["y"], 
+					"x2": this.points[0]["x"], 
+					"y2": this.points[0]["y"],
+				});
+			}
+		}
+	}
+	
+	function drawLines(){
+		for(i = 0; i<this.sideCount; i++){
+			Graphics2D.Draw.line(this.segments[i]["x1"], this.segments[i]["y1"], this.segments[i]["x2"], this.segments[i]["y2"], 2, this.color["r"], this.color["g"], this.color["b"]);
+		}
+	}
+}
+
+
+
+class LightSource{
+	
+	field sourceColor;
+	field lightColor;
+	field x;
+	field y;
+	field held;
+	field size;
+	field castPointList;
+	field intersectionList;
+	
+	constructor(x, y){
+		this.sourceColor = {"r": 255, "g": 255, "b": 0};
+		this.lightColor = {"r": 190, "g": 190, "b": 0};
+		this.x = x;
+		this.y = y;
+		this.held = false;
+		this.size = 30;
+		this.castPointList = [];
+		this.intersectionList = [];
+	}
+	
+	function drawSource(){
+		Graphics2D.Draw.ellipse(this.x-(this.size/2), this.y-(this.size/2), this.size, this.size, this.sourceColor["r"], this.sourceColor["g"], this.sourceColor["b"], 255);
+	}
+	
+	function updatePos(newPos){
+		this.x = newPos["x"];
+		this.y = newPos["y"];
+	}
+	
+	//get points plus ones offset by +-0.01 radians, and sort them radially
+	function getCastList(shapePointList){
+		firstPointList = [];
+		sortedPointList = [];
+		angleList = [];
+		
+		for(i = 0; i<shapePointList.length; i++){
+			//find angle
+			angle = Math.arctan((shapePointList[i]["y"]-this.y),(shapePointList[i]["x"]-this.x)); //arctan operates as arctan2 here
+			angle = angle-0.01;
+			
+			for(j = 0; j<3; j++){
+				dx = Math.cos(angle);
+				dy = Math.sin(angle);
+				firstPointList.add({"x": shapePointList[i]["x"] + dx, "y": shapePointList[i]["y"] + dy, "angle": angle});
+				angleList.add(angle);
+				angle = angle+0.01;
+			}
+			
+		}
+		
+		//sort list by comparing to angle list
+		angleList.sort();
+		
+		for(i = 0; i<angleList.length; i++){
+			for(j = 0; j<firstPointList.length; j++){
+				if(angleList[i] == firstPointList[j]["angle"]){
+					sortedPointList.add(firstPointList[j]);
+				}
+			}
+		}
+		
+		this.castPointList = sortedPointList;
+	}
+	
+	function getIntersectionList(shapeSegmentList, windowSize){
+		intersection = null;
+		newIntersection = null;
+		intersectionList = [];
+		for(i = 0; i<this.castPointList.length; i++){
+			
+			ray = [{"x": this.x, "y": this.y}, {"x": this.castPointList[i]["x"], "y": this.castPointList[i]["y"]}];
+			ray[1] = rayExtend(ray, windowSize);
+			
+			//check if ray intersects with segments, then pick the shortest ray from those intersections
+			intersection = null;
+			for(j = 0; j<shapeSegmentList.length; j++){
+				newIntersection = getIntersection(ray, shapeSegmentList[j]);
+				if(newIntersection !=null){
+					if((intersection == null) || (newIntersection["param"] < intersection["param"])){
+						intersection = newIntersection;
+					}
+				}
+			}
+			if(intersection != null){
+				intersectionList.add(intersection);
+			}
+			
+			/*//draw the lines, this is basically a try-catch with if statements
+			if(intersection != null){
+				Graphics2D.Draw.line(ray[0]["x"], ray[0]["y"], intersection["x"], intersection["y"], 2, 127, 127, 127);
+			}
+			*/
+		}
+		
+		this.intersectionList = intersectionList;
+	}
+	
+	function drawLight(){
+		for(i = 0; i < this.intersectionList.length; i++){
+			if(i < this.intersectionList.length-1){
+				Graphics2D.Draw.triangle(this.x, this.y, this.intersectionList[i]["x"], this.intersectionList[i]["y"], this.intersectionList[i+1]["x"], this.intersectionList[i+1]["y"], this.lightColor["r"], this.lightColor["g"], this.lightColor["b"]);
+			}else{
+				Graphics2D.Draw.triangle(this.x, this.y, this.intersectionList[i]["x"], this.intersectionList[i]["y"], this.intersectionList[0]["x"], this.intersectionList[0]["y"], this.lightColor["r"], this.lightColor["g"], this.lightColor["b"]);
+			}
+		}
+	}
+	
+	function bounds(){
+		return({"xmin": this.x-(this.size*1.1), "ymin": this.y-(this.size*1.1), "xmax": this.x+(this.size*1.1), "ymax": this.y+(this.size*1.1)});
+	}
+}
+
+
+
+//thank you Nicky :) https://ncase.me/sight-and-light/
+function getIntersection(ray, segment){
+	//ray's starting x and y points (px and py), and parametric component directions (dx and dy)
+	r_px = ray[0]["x"];
+	r_py = ray[0]["y"];
+	r_dx = (ray[1]["x"]-r_px);
+	r_dy = (ray[1]["y"]-r_py);
+	
+	//same as above for the line segment
+	s_px = segment["x1"];
+	s_py = segment["y1"];
+	s_dx = (segment["x2"]-s_px);
+	s_dy = (segment["y2"]-s_py);
+	
+	//Find if the lines are parallel, if so there's no intersection
+	r_mag = (((r_dx*r_dx)+(r_dy*r_dy))**0.5);
+	s_mag = (((s_dx*s_dx)+(s_dy*s_dy))**0.5);
+	
+	//check for /0 error
+	if(r_mag==0){
+		return null;
+	}
+	
+	if(r_dx/r_mag==s_dx/s_mag && r_dy/r_mag==s_dy/s_mag){
+		return null;
+	}
+	
+	//find T1 and T2, for the parametric equations
+	try{
+		t2 = ((r_dx*(s_py-r_py)) + (r_dy*(r_px-s_px)))/((s_dx*r_dy) - (s_dy*r_dx));
+		t1 = (s_px+(s_dx*t2)-r_px)/r_dx;
+	}catch(Exception e){
+		//catches /0 errors when lines are straight horizontal/vertical
+		return null;
+	}
+	
+	//if the parametric T values are past these parameters the intersection isn't on the segments
+	if(t1<0.0 || t1>1.0){
+		return null;
+	}
+	
+	if(t2<-0.00001 || t2>1.00001){
+		return null;
+	}
+	
+	//otherwise, you're good, and can plug in all the variables you just found to find the point of intersection
+	return {
+		"x": r_px+(r_dx*t1),
+		"y": r_py+(r_dy*t1),
+		"param": t1,
+	};
+	
+}
+
+
+
+function checkBounds(point, bounds){
+	if((point["x"]<bounds["xmin"] || point["x"]>bounds["xmax"]) || (point["y"]<bounds["ymin"] || point["y"]>bounds["ymax"])){
+		return false;
+	}else{
+		return true;
+	}
+}
+
+
+
+function rayExtend(ray, windowSize){
+	//take the start and end point of a ray and find a parametric, and use that to extend the line until it's outside of the window, then return the new endpoint
+	r_px = ray[0]["x"];
+	r_py = ray[0]["y"];
+	r_dx = (ray[1]["x"]-r_px);
+	r_dy = (ray[1]["y"]-r_py);
+	
+	newx = 0;
+	newy = 0;
+	t1 = 1;
+	inBounds = true;
+	
+	while (inBounds){
+		t1 = t1 + 0.1;
+		newx = r_px+(r_dx*t1);
+		newy = r_py+(r_dy*t1);
+		
+		inBounds = checkBounds({"x": newx, "y": newy}, {"xmin": 0, "ymin": 0, "xmax": windowSize["x"], "ymax": windowSize["y"]});
+	}
+	
+	return {
+		"x": r_px+(r_dx*t1),
+		"y": r_py+(r_dy*t1),
+		"param": t1,
+	};
+	
+}
+
+
+
+function main(){
+	
+	title = "Shadows?!";
+	fps = 30;
+	windowSize = {"x": 800.0, "y": 600.0};
+	window = new Game.GameWindow(title, fps, windowSize["x"], windowSize["y"]);
+	
+	gameRunning = true;
+	keysPressed = {
+		"f": false, //placeholder value
+		"mouseLeft": false,
+	};
+	mousePos = {
+		"x": windowSize["x"]/2,
+		"y": windowSize["y"]/2,
+	};
+	
+	//list of the shapes and their respective verteces
+	wallColor = {"r": 127.0, "g": 127.0, "b": 127.0};
+	border = new Shape(wallColor,[{"x": 0.0, "y": 0.0},{"x": windowSize["x"], "y": 0.0},{"x": windowSize["x"], "y": windowSize["y"]},{"x": 0.0, "y": windowSize["y"]}]);
+	shape1 = new Shape(wallColor,[{"x": 100.0, "y": 325.0},{"x": 75.0, "y": 450.0},{"x": 175.0, "y": 475.0}]);
+	shape2 = new Shape(wallColor,[{"x": 125.0, "y": 100.0},{"x": 250.0, "y": 125.0},{"x": 275.0, "y": 175.0},{"x": 175.0, "y": 150.0}]);
+	shape3 = new Shape(wallColor,[{"x": 225.0, "y": 325.0},{"x": 375.0, "y": 250.0},{"x": 400.0, "y": 400.0}]);
+	shape4 = new Shape(wallColor,[{"x": 500.0, "y": 100.0},{"x": 550.0, "y": 175.0},{"x": 700.0, "y": 200.0},{"x": 600.0, "y": 50.0}]);
+	shape5 = new Shape(wallColor,[{"x": 500.0, "y": 300.0},{"x": 600.0, "y": 325.0},{"x": 575.0, "y": 400.0},{"x": 525.0, "y": 475.0}]);
+	shape6 = new Shape(wallColor,[{"x": 675.0, "y": 450.0},{"x": 725.0, "y": 400.0},{"x": 700.0, "y": 500.0}]);
+	shapeList = [border, shape1, shape2, shape3, shape4, shape5, shape6];
+	
+	shapePointList = [];
+	shapeSegmentList = [];
+	for(i = 0; i<shapeList.length; i++){
+		//list of points in said shapes
+		for(j = 0; j<shapeList[i].points.length; j++){
+			shapePointList.add(shapeList[i].points[j]);
+		}
+		//list of segments of those solid shapes
+		for(j = 0; j<shapeList[i].segments.length; j++){
+			shapeSegmentList.add(shapeList[i].segments[j]);
+		}
+	}
+	
+	//generate light sources
+	lightSource0 = new LightSource(200, 200);
+	lightSource1 = new LightSource(windowSize["x"]-200, windowSize["y"]-200);
+	lightSourceList = [lightSource0, lightSource1];
+	
+	
+	
+	while(gameRunning){
+	
+		eventList = window.pumpEvents();
+		
+		for (event : eventList) {
+			//closes the game when an ending event is triggered
+            if (event.type == Game.EventType.QUIT) {
+                gameRunning = false;
+            }
+			//keyboard keys being pressed
+			if (event.type == Game.EventType.KEY_DOWN || event.type == Game.EventType.KEY_UP){
+				isPress = (event.type == Game.EventType.KEY_DOWN); //this makes isPress true if event.type is KEY_DOWN, and false otherwise, to indicate if the key has been pressed this frame
+				switch(event.key){
+					case Game.KeyboardKey.F:
+						keysPressed["f"] = isPress;
+						break;
+				}
+			}
+			//mouse movement
+			if(event.type == Game.EventType.MOUSE_MOVE){
+				mousePos["x"] = event.x;
+				mousePos["y"] = event.y;
+			}
+			//pick up a light source
+			if(event.type == Game.EventType.MOUSE_LEFT_DOWN || event.type == Game.EventType.MOUSE_LEFT_UP){
+				isPress = (event.type == Game.EventType.MOUSE_LEFT_DOWN);
+				keysPressed["mouseLeft"] = isPress;
+				if(keysPressed["mouseLeft"]){
+					for(i=0; i<lightSourceList.length; i++){
+						if(checkBounds(mousePos,lightSourceList[i].bounds())){
+							lightSourceList[i].held = true;
+							break;
+						}
+					}
+				}else{
+					for(i=0; i<lightSourceList.length; i++){
+						lightSourceList[i].held = false;
+					}
+				}
+			}
+		}
+		
+		//make background black
+		Graphics2D.Draw.fill(0, 0, 0);
+		
+		//draw the light
+		for(i=0; i<lightSourceList.length; i++){
+			if(lightSourceList[i].held){
+				lightSourceList[i].updatePos(mousePos);
+			}
+			lightSourceList[i].getCastList(shapePointList);
+			lightSourceList[i].getIntersectionList(shapeSegmentList, windowSize);
+			lightSourceList[i].drawLight();
+		}
+		for(i=0; i<lightSourceList.length; i++){
+			lightSourceList[i].drawSource();
+		}
+		
+		//draw the shapes
+		for(i = 0; i<shapeList.length; i++){
+			shapeList[i].drawLines();
+		}
+		
+		window.clockTick();
+	}
+	
+}
